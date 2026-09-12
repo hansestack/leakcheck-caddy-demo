@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>caddy-hansestack demo</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f4f5f7;
+    }
+    .card {
+      width: 360px;
+      max-width: 90vw;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+      padding: 32px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      margin: 0 0 4px;
+    }
+    p.subtitle {
+      margin: 0 0 24px;
+      color: #666;
+      font-size: 0.9rem;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .message {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      display: none;
+    }
+    .message.success {
+      background: #dcfce7;
+      color: #166534;
+      display: block;
+    }
+    .message.error {
+      background: #fee2e2;
+      color: #991b1b;
+      display: block;
+    }
+    .message.warning {
+      background: #fef9c3;
+      color: #854d0e;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Sign in</h1>
+    <p class="subtitle">
+      Passwords here are checked for known leaks entirely at the reverse
+      proxy layer &mdash; this backend has no idea it's happening.
+    </p>
+
+    <form id="login-form">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" value="demo@example.com" required />
+
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" value="password123" required />
+
+      <button type="submit" id="submit-btn">Log in</button>
+    </form>
+
+    <div id="message" class="message"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("login-form");
+    const messageEl = document.getElementById("message");
+    const submitBtn = document.getElementById("submit-btn");
+
+    function showMessage(text, kind) {
+      messageEl.textContent = text;
+      messageEl.className = "message " + kind;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      submitBtn.disabled = true;
+      messageEl.className = "message";
+
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      try {
+        const res = await fetch("/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        // "block" mode rejects a confirmed leak outright with block_status
+        // (401 by default). "enrich_response" mode (the default in this
+        // demo's Caddyfile) never rejects the request -- it only tags the
+        // response with a header, so we check both signals here.
+        const leaked = res.headers.get("X-Hansestack-Leaked") === "true";
+        const leakCount = res.headers.get("X-Hansestack-Leak-Count");
+
+        if (res.status === 401) {
+          showMessage(
+            "\u274C Password Leaked \u2014 login blocked by the leak-check proxy.",
+            "error"
+          );
+        } else if (res.status === 201 && leaked) {
+          showMessage(
+            "\u26A0\uFE0F Login succeeded, but this password was found in " +
+              (leakCount ? leakCount + " " : "a ") +
+              "known breach (X-Hansestack-Leaked: true).",
+            "warning"
+          );
+        } else if (res.status === 201) {
+          showMessage("\u2705 Success \u2014 login accepted.", "success");
+        } else {
+          showMessage("Unexpected response: HTTP " + res.status, "error");
+        }
+      } catch (err) {
+        showMessage("Request failed: " + err.message, "error");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+services:
+  caddy:
+    image: ghcr.io/hansestack/caddy-hansestack:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      # Admin API / metrics endpoint: only bound to localhost on the HOST,
+      # even though Caddy itself listens on 0.0.0.0:2019 inside the
+      # container (see the Caddyfile comment for why).
+      - "127.0.0.1:2019:2019"
+    env_file:
+      - .env
+    environment:
+      HANSESTACK_API_KEY: ${HANSESTACK_API_KEY:?HANSESTACK_API_KEY must be set}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - dummy-backend
+
+  dummy-backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    # No host port published on purpose: the backend is only ever reached
+    # through Caddy at dummy-backend:80, demonstrating that it needs zero
+    # awareness of the leak-check layer in front of it.
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    restart: unless-stopped
+    command:
+      - "-promscrape.config=/etc/victoriametrics/scrape.yml"
+      - "-retentionPeriod=30d"
+    volumes:
+      - ./metrics/scrape.yml:/etc/victoriametrics/scrape.yml:ro
+      - vm_data:/victoria-metrics-data
+    depends_on:
+      - caddy
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - victoriametrics
+
+volumes:
+  caddy_data:
+  caddy_config:
+  vm_data:
+  grafana_data:

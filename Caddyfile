@@ -1,0 +1,28 @@
+{
+	# Bound to all interfaces here (0.0.0.0) so that Docker's published port
+	# mapping below can reach it; the docker-compose.yml only forwards it to
+	# 127.0.0.1 on the HOST, so it is not exposed to the outside network.
+	admin 0.0.0.0:2019
+
+	# Exposes this plugin's hansestack_leakcheck_* Prometheus counters (and
+	# Caddy's own caddy_http_* metrics) on the admin API's /metrics endpoint.
+	metrics
+}
+
+:80 {
+	# Scoped to /login* so that every other route reaches reverse_proxy directly.
+	hansestack /login* leakcheck {
+		api_key {$HANSESTACK_API_KEY}
+		mode enrich_response
+		password_field "password"
+		header_leaked "X-Hansestack-Leaked"
+		header_count "X-Hansestack-Leak-Count"
+		block_status 401
+
+		timeout {$HANSESTACK_TIMEOUT:500ms}
+		circuit_breaker_threshold {$HANSESTACK_CIRCUIT_BREAKER_THRESHOLD:0}
+		circuit_breaker_cooldown {$HANSESTACK_CIRCUIT_BREAKER_COOLDOWN:30s}
+	}
+
+	reverse_proxy dummy-backend:80
+}

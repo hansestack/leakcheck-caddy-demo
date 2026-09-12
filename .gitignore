@@ -1,0 +1,9 @@
+# Secrets / local config
+.env
+
+# Go
+backend/dummy-backend
+bin/
+
+# OS cruft
+.DS_Store

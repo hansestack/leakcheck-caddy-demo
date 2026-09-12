@@ -1,0 +1,10 @@
+# VictoriaMetrics scrape config (Prometheus-compatible) for the Caddy admin
+# API's /metrics endpoint. This exposes both Caddy's own caddy_http_*
+# metrics and the plugin's hansestack_leakcheck_* counters.
+scrape_configs:
+  - job_name: "caddy"
+    scrape_interval: 15s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "caddy:2019"
