@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>caddy-hansestack demo</title>
+  <title>Hansestack Demo Login</title>
+  <link rel="shortcut icon" href="https://hansestack.de/favicon.ico" sizes="32x32" />
+  <link rel="icon" href="https://hansestack.de/favicon-16x16.png" type="image/png" sizes="16x16" />
+  <link rel="icon" href="https://hansestack.de/favicon-32x32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="https://hansestack.de/apple-touch-icon.png" sizes="180x180" />
   <style>
     :root {
       color-scheme: light dark;
@@ -21,6 +25,7 @@
       width: 360px;
       max-width: 90vw;
       background: #fff;
+      color: #111827;
       border-radius: 12px;
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
       padding: 32px;
@@ -43,28 +48,43 @@
     input {
       width: 100%;
       box-sizing: border-box;
-      padding: 10px 12px;
+      background-color: rgb(255, 255, 255);
+      color: rgb(51, 65, 85);
+      border: 1px solid rgb(209, 213, 219);
+      border-radius: 6px;
+      padding: 8px 12px;
       margin-bottom: 16px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      font-size: 1rem;
+      font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 20px;
     }
     button {
       width: 100%;
-      padding: 12px;
+      box-sizing: border-box;
+      background-color: rgb(15, 23, 42);
+      color: rgb(255, 255, 255);
       border: none;
-      border-radius: 8px;
-      background: #2563eb;
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 600;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 20px;
+      text-align: center;
       cursor: pointer;
+      transition-property: color, background-color, border-color,
+        text-decoration-color, fill, stroke;
+      transition-duration: 0.15s;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     }
     button:hover {
-      background: #1d4ed8;
+      background-color: rgb(30, 41, 59);
     }
     button:disabled {
-      background: #94a3b8;
+      background-color: rgb(148, 163, 184);
       cursor: not-allowed;
     }
     .message {
@@ -90,10 +110,33 @@
       color: #854d0e;
       display: block;
     }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .brand .logo {
+      height: 24px;
+      width: auto;
+      max-width: 100%;
+    }
+    .brand .brand-name {
+      color: rgb(0, 0, 0);
+      font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 24px;
+    }
   </style>
 </head>
 <body>
   <div class="card">
+    <div class="brand">
+      <img src="https://hansestack.de/images/logo.png" alt="Hansestack" class="logo" />
+      <span class="brand-name">Hansestack Demo Login</span>
+    </div>
     <h1>Sign in</h1>
     <p class="subtitle">
       Passwords here are checked for known leaks entirely at the reverse
