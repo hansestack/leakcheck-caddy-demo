@@ -12,6 +12,7 @@ services:
       - .env
     environment:
       HANSESTACK_API_KEY: ${HANSESTACK_API_KEY:?HANSESTACK_API_KEY must be set}
+      HANSESTACK_MAX_IDLE_CONNS: ${HANSESTACK_MAX_IDLE_CONNS:-200}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

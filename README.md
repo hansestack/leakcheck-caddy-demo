@@ -17,13 +17,13 @@ sequenceDiagram
     autonumber
     participant Client
     participant Caddy as Caddy<br/>(hansestack leakcheck)
-    participant API as Hansestack<br/>Leak-Check API
+    participant API as Hansestack SaaS API<br/>(public, over the internet)
     participant Backend as dummy-backend
 
     Client->>Caddy: POST /login {email, password}
 
     par mode: enrich_response — runs concurrently, zero added latency
-        Caddy->>API: k-Anonymity check<br/>(password never leaves in identifiable form)
+        Caddy->>API: HTTPS k-Anonymity check<br/>(password never leaves in identifiable form)
         API-->>Caddy: leaked: true|false, count
     and
         Caddy->>Backend: POST /login (unmodified)
@@ -32,6 +32,12 @@ sequenceDiagram
 
     Caddy-->>Client: 201 Created<br/>+ X-Hansestack-Leaked<br/>+ X-Hansestack-Leak-Count
 ```
+
+By default (no `endpoint` set in the Caddyfile), Caddy calls the public
+**Hansestack SaaS API** over the internet for every check — there is no
+local leak-check server or sidecar in this demo. Swapping to a self-hosted
+/ on-premise `endpoint` is possible but out of scope for this demo's
+default configuration.
 
 The backend is only ever called through Caddy — it never sees the leak
 check happen, and (in `enrich_response` mode) it is never blocked by it
@@ -74,10 +80,14 @@ not something this repo does for you silently.
 
 | Service          | Image                                          | Purpose                                             |
 |------------------|-------------------------------------------------|------------------------------------------------------|
-| `caddy`          | `ghcr.io/hansestack/caddy-hansestack:latest`     | Reverse proxy + leak-check enforcement point         |
+| `caddy`          | `ghcr.io/hansestack/caddy-hansestack:latest`     | Reverse proxy + leak-check enforcement point, calling the public Hansestack SaaS API |
 | `dummy-backend`  | built from `backend/`                            | Trivial Go app, oblivious to any of the above         |
 | `victoriametrics`| `victoriametrics/victoria-metrics`               | Scrapes Caddy's `/metrics` (Prometheus format)        |
 | `grafana`        | `grafana/grafana`                                | Dashboards for `caddy_http_*` and `hansestack_*` metrics |
+
+There is no local leak-check server or sidecar in this stack — `caddy` talks
+directly to the public Hansestack SaaS API over the internet, using only
+`HANSESTACK_API_KEY` for authentication.
 
 ## Quick start
 
@@ -147,9 +157,25 @@ Run `make help` at any time to see this list with descriptions.
 
 See [`Caddyfile`](./Caddyfile) for the full directive and
 [`.env.skel`](./.env.skel) for the environment variables it reads
-(`HANSESTACK_API_KEY`, plus optional `HANSESTACK_TIMEOUT` and circuit
-breaker tuning). None of these are required beyond `HANSESTACK_API_KEY` —
-the rest have sane defaults baked into the Caddyfile itself.
+(`HANSESTACK_API_KEY`, plus optional `HANSESTACK_TIMEOUT`, circuit
+breaker tuning, and `HANSESTACK_MAX_IDLE_CONNS`). None of these are
+required beyond `HANSESTACK_API_KEY` — the rest have sane defaults baked
+into the Caddyfile itself.
+
+The Caddyfile has no `endpoint` directive set, so the `hansestack
+leakcheck` handler defaults to the public Hansestack SaaS API — there is no
+local leak-check server to run or configure. `max_idle_conns` (default
+`200`, overridable via `HANSESTACK_MAX_IDLE_CONNS`) caps how many idle
+keep-alive connections the underlying HTTP client pools to that SaaS API,
+which bounds TCP socket growth under a login traffic spike instead of
+opening a fresh connection per concurrent leak check. As with the other
+tuning knobs (`timeout`, `circuit_breaker_threshold`,
+`circuit_breaker_cooldown`), it is only worth touching if you have an
+explicit reason to — the default of `200` is sane for this demo. Per this
+plugin's own guidance, `mode enrich_response` remains the default here:
+it adds full observability into leaked-password attempts without ever
+being able to reject a login, which is why nothing in this repo needs to
+change to safely enable leak-checking against your real login flow.
 
 ## Repository layout
 
