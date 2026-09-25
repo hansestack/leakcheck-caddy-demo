@@ -111,9 +111,11 @@ directly to the public Hansestack SaaS API over the internet, using only
 
    - **App**: [http://localhost](http://localhost) — try logging in with a
      known-leaked password (e.g. `password123`) and watch the response.
-   - **Grafana**: [http://localhost:3000](http://localhost:3000)
-     (login `admin` / `admin`) — the "Hansestack Leak-Check Demo" dashboard
-     is pre-provisioned under Dashboards, organized into four rows:
+   - **Grafana**: [http://localhost:3000](http://localhost:3000) — no
+     login required. Grafana is configured for anonymous, read-only
+     (Viewer) access, and lands you directly on the "Hansestack Leak-Check
+     Demo" dashboard — the only dashboard provisioned in this stack —
+     organized into four rows:
      - **Traffic Overview** — Caddy's request rate/latency and the leak
        check's verdict/outcome trends over time.
      - **Verdicts** — color-coded stat tiles for Total Checks, Leaked
@@ -134,6 +136,13 @@ directly to the public Hansestack SaaS API over the internet, using only
 The Caddy admin API (and its `/metrics` endpoint) is additionally reachable
 at `http://127.0.0.1:2019/metrics` directly from the host, for ad-hoc
 `curl`ing — it is bound to `127.0.0.1` only, not exposed beyond the host.
+
+Grafana's anonymous access is scoped to the `Viewer` role, so it can view
+the provisioned dashboard but cannot edit it, create new ones, or reach
+admin/server settings. This is a convenience for a local demo only — do
+not expose this Grafana instance to the internet as configured. The
+`admin` / `admin` credentials still work at Grafana's `/login` page if you
+need to make changes.
 
 ## Makefile targets
 
