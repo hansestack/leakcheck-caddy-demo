@@ -65,6 +65,25 @@ This is the safe default for a customer-facing login flow: you get full
 observability into leaked-password attempts without ever being able to
 lock out a legitimate user due to an API hiccup.
 
+### Even Safer: `observe` Mode
+
+Want the absolute lowest-risk way to pilot Hansestack against a real login
+endpoint, before you commit to touching a single request or response
+header? Switch the Caddyfile's `mode` to `observe`. It runs the exact same
+k-anonymity leak check and records the exact same metrics — including the
+new IoC correlation counter described below — but adds **no header, no
+blocking, no modification whatsoever** to the request or response. Your
+backend and your client see byte-for-byte the same traffic as if the
+plugin weren't installed at all; only Caddy's own `/metrics` endpoint
+knows the check ran. Because this counter fires in every mode, not just
+`block` — `observe`/`enrich_request`/`enrich_response` all forward the
+request regardless of the check result — the "Confirmed ATOs" tile in
+Grafana lights up identically whether you're running `observe`,
+`enrich_response`, or `block`. It's a one-line Caddyfile edit
+(`mode observe`) if you want to try it; this repo's default stays
+`enrich_response` since the demo frontend uses the response header to show
+a UI banner.
+
 The Caddyfile also sets `block_status 401`, which only takes effect if you
 switch `mode` to `block`. In `block` mode, Caddy rejects the request
 outright with that status code — but **only on a confirmed leak**, never
@@ -109,15 +128,34 @@ directly to the public Hansestack SaaS API over the internet, using only
 
 3. Open the app:
 
-   - **App**: [http://localhost](http://localhost) — try logging in with a
-     known-leaked password (e.g. `password123`) and watch the response.
+   - **App**: [http://localhost](http://localhost) — log in with a
+     known-leaked password, **`password123`**, then immediately flip to
+     Grafana: the new **"🚨 Confirmed ATOs (Leaked + 2xx)"** tile turns
+     bright red. This isn't a simulated demo value — it's real: the leak
+     check genuinely confirms `password123` is breached, and
+     `dummy-backend`'s `POST /login` **always** returns `201 Created`
+     unconditionally (no database, no password hashing, no auth logic at
+     all), so every leaked-password login in this demo is, by
+     construction, a live "Confirmed ATO" — a leaked credential that was
+     accepted by the backend. If you instead switch the Caddyfile's `mode`
+     to `block`, the same `password123` login now gets a `401` instead,
+     and the **"🛡️ Defeated ATOs (Leaked + 4xx)"** tile increments in
+     place of the red one — a quick before/after of enabling blocking.
    - **Grafana**: [http://localhost:3000](http://localhost:3000) — no
      login required. Grafana is configured for anonymous, read-only
      (Viewer) access, and lands you directly on the "Hansestack Leak-Check
      Demo" dashboard — the only dashboard provisioned in this stack —
-     organized into four rows:
+     organized into five rows:
      - **Traffic Overview** — Caddy's request rate/latency and the leak
        check's verdict/outcome trends over time.
+     - **🚨 Indicator of Compromise (IoC)** — the headline row: "Confirmed
+       ATOs" (leaked password + 2xx, bright red if >0) and "Defeated ATOs"
+       (leaked password + 4xx, amber if >0) stat tiles, a third tile for
+       leaked-but-fail-open-skipped responses, and a "Response Correlation"
+       timeseries breaking every backend response down by leak-check
+       result (`leaked`/`not_leaked`/`skipped`) and status class
+       (`2xx`/`3xx`/`4xx`/`5xx`/`unknown`) — the single most actionable
+       pairing this plugin exposes.
      - **Verdicts** — color-coded stat tiles for Total Checks, Leaked
        (green unless >0, then red), and Not Leaked, totaled over whatever
        time range is currently selected in the dashboard's time picker
@@ -204,6 +242,6 @@ change to safely enable leak-checking against your real login flow.
     │   ├── datasources/ds.yml         # auto-adds VictoriaMetrics as a datasource
     │   └── dashboards/dashboards.yml  # auto-loads grafana/dashboards/*.json
     └── dashboards/
-        └── hansestack.json            # placeholder dashboard
+        └── hansestack.json            # Traffic/IoC/Verdicts/Fail-Open/Health dashboard
 ```
 
