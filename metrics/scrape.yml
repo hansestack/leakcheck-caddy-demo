@@ -3,7 +3,7 @@
 # metrics and the plugin's hansestack_leakcheck_* counters.
 scrape_configs:
   - job_name: "caddy"
-    scrape_interval: 15s
+    scrape_interval: 1s
     metrics_path: /metrics
     static_configs:
       - targets:
