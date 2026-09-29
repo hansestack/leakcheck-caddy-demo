@@ -1,0 +1,76 @@
+{
+	# Standard edge proxy (API Gateway / Load Balancer stand-in) admin API,
+	# kept on its own port so it never collides with the hansestack Caddy
+	# instance's own :2019 admin API behind it.
+	admin 0.0.0.0:2019
+
+	# The rate_limit directive (github.com/mholt/caddy-ratelimit) is a
+	# non-standard HTTP handler module, so the Caddyfile adapter doesn't
+	# know where to place it in the middleware chain by default. It MUST
+	# run before reverse_proxy, or a request could be forwarded upstream
+	# to our sponsored SaaS-API-key-consuming middleware before being
+	# rejected by the rate limiter.
+	order rate_limit before reverse_proxy
+}
+
+# {$SITE_ADDRESS:http://localhost} lets this exact same Caddyfile serve two
+# very different environments with zero edits:
+#   - Locally (default, no env var set): "http://localhost" -- the explicit
+#     "http://" scheme tells Caddy this is plaintext-only, so no TLS/ACME is
+#     attempted against a non-routable hostname.
+#   - Deployed (e.g. SITE_ADDRESS=demo.hansestack.de): a bare domain with no
+#     scheme tells Caddy this is a real, publicly reachable site, so it
+#     automatically obtains and renews a trusted Let's Encrypt certificate
+#     and serves HTTPS, redirecting HTTP to HTTPS -- with no other change to
+#     this file.
+{$SITE_ADDRESS:http://localhost} {
+	# Serves Grafana under a subpath so the whole demo -- app + dashboards --
+	# is reachable through this single edge proxy. Grafana itself is
+	# configured (see docker-compose.yml) with GF_SERVER_SERVE_FROM_SUB_PATH
+	# to be aware it's mounted at /grafana rather than at the domain root, so
+	# the full "/grafana/*" prefix is forwarded unstripped (plain `handle`,
+	# not `handle_path`) -- Grafana's own router needs to see it.
+	handle /grafana/* {
+		reverse_proxy grafana:3000
+	}
+
+	# The public login endpoint is the one route that calls out to our
+	# sponsored, shared Hansestack SaaS API key on every request. Rate
+	# limiting it here -- at the edge, before it ever reaches the
+	# hansestack middleware -- protects that shared key from being
+	# exhausted or abused by any single noisy client, independent of
+	# whatever rate limiting (if any) the Hansestack API itself applies.
+	handle /login* {
+		rate_limit {
+			zone login_per_client {
+				key {remote_host}
+				events {$RATE_LIMIT_EVENTS:10}
+				window {$RATE_LIMIT_WINDOW:1m}
+			}
+		}
+
+		# --------------------------------------------------------------
+		# EDUCATIONAL: This single line is the entire point of this demo.
+		#
+		# Today, /login traffic (after passing the rate limit above) is
+		# routed to `caddy:80` -- the Hansestack leak-check middleware --
+		# which in turn forwards to the real backend. To see how easily
+		# Hansestack can be removed from the infrastructure, simply
+		# change `caddy:80` to `dummy-backend:80` below. The app will
+		# work exactly the same, just without leak checking (the rate
+		# limit above still applies either way). No backend code, no
+		# frontend code, and no other service change is required either
+		# way -- proving the security layer is a transparent, drop-in
+		# addition to (or removal from) an existing network chain.
+		# --------------------------------------------------------------
+		reverse_proxy caddy:80
+	}
+
+	# Everything else also flows through the hansestack middleware, which
+	# itself only actively intercepts /login* (see ./Caddyfile) and
+	# transparently forwards all other paths straight to dummy-backend.
+	handle {
+		reverse_proxy caddy:80
+	}
+}
+

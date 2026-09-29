@@ -17,6 +17,7 @@
       margin: 0;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       background: #f4f5f7;
@@ -129,9 +130,65 @@
       font-weight: 800;
       line-height: 24px;
     }
+    .warning-banner {
+      width: 360px;
+      max-width: 90vw;
+      box-sizing: border-box;
+      background: #dc2626;
+      color: #ffffff;
+      font-weight: 700;
+      text-align: center;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .grafana-link {
+      display: block;
+      width: 360px;
+      max-width: 90vw;
+      box-sizing: border-box;
+      text-align: center;
+      margin-top: 16px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: #f4711f;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      text-decoration: none;
+      transition: background-color 0.15s ease;
+    }
+    .grafana-link:hover {
+      background: #d9600f;
+    }
+    .repo-link {
+      display: block;
+      width: 360px;
+      max-width: 90vw;
+      box-sizing: border-box;
+      text-align: center;
+      margin-top: 10px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: transparent;
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-decoration: none;
+      border: 1px solid rgb(209, 213, 219);
+      transition: background-color 0.15s ease;
+    }
+    .repo-link:hover {
+      background: #f4f5f7;
+    }
   </style>
 </head>
 <body>
+  <div class="warning-banner">
+    ⚠️ LIVE DEMO: DO NOT ENTER REAL PASSWORDS! Use 'password123' to test the leak check.
+  </div>
   <div class="card">
     <div class="brand">
       <img src="https://hansestack.de/images/logo.png" alt="Hansestack" class="logo" />
@@ -154,6 +211,20 @@
     </form>
 
     <div id="message" class="message"></div>
+
+    <a
+      class="grafana-link"
+      href="/grafana/d/hansestack-demo/hansestack-leak-check-demo?orgId=1&kiosk=tv&refresh=5s"
+      target="_blank"
+      rel="noopener noreferrer"
+    >📊 Open Live Grafana Dashboard (Kiosk Mode)</a>
+
+    <a
+      class="repo-link"
+      href="https://github.com/hansestack/leakcheck-caddy-demo"
+      target="_blank"
+      rel="noopener noreferrer"
+    >💻 Want to try this in your own infrastructure? Check out your own test env: github.com/hansestack/leakcheck-caddy-demo</a>
   </div>
 
   <script>

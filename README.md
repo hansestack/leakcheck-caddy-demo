@@ -16,11 +16,14 @@ layer**, in front of the backend, configured purely via the `Caddyfile`.
 sequenceDiagram
     autonumber
     participant Client
+    participant Edge as edge-proxy<br/>(Rate Limit / TLS)
     participant Caddy as Caddy<br/>(hansestack leakcheck)
     participant API as Hansestack SaaS API<br/>(public, over the internet)
     participant Backend as dummy-backend
 
-    Client->>Caddy: POST /login {email, password}
+    Client->>Edge: POST /login {email, password}
+    Note over Edge: rate_limit zone: N events / window,<br/>keyed per client -- protects the shared<br/>Hansestack API key. Over the limit? 429,<br/>Caddy and the backend never see the request.
+    Edge->>Caddy: POST /login (unmodified, proxied)
 
     par mode: enrich_response — runs concurrently, zero added latency
         Caddy->>API: HTTPS k-Anonymity check<br/>(password never leaves in identifiable form)
@@ -30,7 +33,8 @@ sequenceDiagram
         Backend-->>Caddy: 201 Created<br/>(no leak-check awareness whatsoever)
     end
 
-    Caddy-->>Client: 201 Created<br/>+ X-Hansestack-Leaked<br/>+ X-Hansestack-Leak-Count
+    Caddy-->>Edge: 201 Created<br/>+ X-Hansestack-Leaked<br/>+ X-Hansestack-Leak-Count
+    Edge-->>Client: 201 Created<br/>+ X-Hansestack-Leaked<br/>+ X-Hansestack-Leak-Count
 ```
 
 By default (no `endpoint` set in the Caddyfile), Caddy calls the public
@@ -51,6 +55,35 @@ security-relevant behavior — checking the submitted password against a
 k-anonymity leak corpus, without the plaintext password ever leaving the
 process in identifiable form — happens in Caddy, before the request even
 reaches the backend.
+
+### Transparent Insertion & Removal
+
+This repo goes one step further to prove the point: a standard
+`edge-proxy` (a stand-in for any API Gateway or Load Balancer you'd find
+in a real enterprise network) sits in front of everything, on the only
+host port this stack publishes (`80`). It has exactly one job-relevant
+routing decision to make — where does `/login` traffic go next — and that
+decision lives in a single `reverse_proxy` line in
+[`EdgeCaddyfile`](./EdgeCaddyfile). Today it points at `caddy:80`, the
+Hansestack leak-check middleware, which forwards on to `dummy-backend:80`.
+Change that one line to point at `dummy-backend:80` directly instead, and
+the entire leak-check layer is gone from the request path — no backend
+code changes, no frontend changes, no other service touched — the app
+behaves identically, just without the k-anonymity check. That one-line
+swap is the whole demo: Hansestack is a drop-in addition to (or removal
+from) an existing network chain, not a rewrite of it.
+
+The `edge-proxy` also owns the two cross-cutting concerns a real API
+Gateway or Load Balancer always owns, regardless of what sits behind it:
+**TLS termination** (via `{$SITE_ADDRESS}` — see
+[`EdgeCaddyfile`](./EdgeCaddyfile) — a bare domain there gets you a
+Let's Encrypt certificate automatically, no other config change needed)
+and **rate limiting** `/login` (via the `mholt/caddy-ratelimit` module) to
+protect the shared, sponsored Hansestack SaaS API key this demo uses from
+being exhausted or abused by any single client. Both concerns live
+entirely in the edge layer and are completely unaware that Hansestack
+does or doesn't exist one hop downstream — exactly the separation of
+concerns you'd want in a real enterprise network.
 
 ### Why `enrich_response` and not `block`?
 
@@ -99,10 +132,11 @@ not something this repo does for you silently.
 
 | Service          | Image                                          | Purpose                                             |
 |------------------|-------------------------------------------------|------------------------------------------------------|
-| `caddy`          | `ghcr.io/hansestack/caddy-hansestack:latest`     | Reverse proxy + leak-check enforcement point, calling the public Hansestack SaaS API |
+| `edge-proxy`     | custom xcaddy build (`caddy:builder-alpine` + `mholt/caddy-ratelimit`) | Stand-in for a real enterprise API Gateway / Load Balancer. The only service with published host ports (`80`, `443`); terminates TLS automatically via `SITE_ADDRESS` (Let's Encrypt in production), rate-limits `/login` to protect the shared Hansestack API key, routes `/grafana/*` to Grafana, and everything else to `caddy`. Swap one line in [`EdgeCaddyfile`](./EdgeCaddyfile) to route straight to `dummy-backend` instead, and Hansestack is transparently removed from the chain. |
+| `caddy`          | `ghcr.io/hansestack/caddy-hansestack:latest`     | Reverse proxy + leak-check enforcement point, calling the public Hansestack SaaS API. Only reachable internally, via `edge-proxy` |
 | `dummy-backend`  | built from `backend/`                            | Trivial Go app, oblivious to any of the above         |
 | `victoriametrics`| `victoriametrics/victoria-metrics`               | Scrapes Caddy's `/metrics` (Prometheus format)        |
-| `grafana`        | `grafana/grafana`                                | Dashboards for `caddy_http_*` and `hansestack_*` metrics |
+| `grafana`        | `grafana/grafana`                                | Dashboards for `caddy_http_*` and `hansestack_*` metrics, served under `/grafana/` via `edge-proxy` |
 
 There is no local leak-check server or sidecar in this stack — `caddy` talks
 directly to the public Hansestack SaaS API over the internet, using only
@@ -141,7 +175,20 @@ directly to the public Hansestack SaaS API over the internet, using only
      to `block`, the same `password123` login now gets a `401` instead,
      and the **"🛡️ Defeated ATOs (Leaked + 4xx)"** tile increments in
      place of the red one — a quick before/after of enabling blocking.
-   - **Grafana**: [http://localhost:3000](http://localhost:3000) — no
+     The app page itself also has a **"📊 Open Live Grafana Dashboard
+     (Kiosk Mode)"** link right below the login form — click it for a
+     menu-free, auto-refreshing (every 5s) view of the exact dashboard
+     described below.
+
+     Want to see the rate limiter in action? Fire more than
+     `RATE_LIMIT_EVENTS` (default `10`) requests at `/login` within
+     `RATE_LIMIT_WINDOW` (default `1m`) from the same client — e.g. `make
+     test-login` in a tight loop — and the edge-proxy itself starts
+     replying `429 Too Many Requests` before Hansestack or the backend
+     ever see the extra requests, protecting the shared demo API key.
+   - **Grafana**: no longer published on its own port — reachable at
+     [http://localhost/grafana/](http://localhost/grafana/) through the
+     `edge-proxy`, or via the kiosk-mode link on the app page above. No
      login required. Grafana is configured for anonymous, read-only
      (Viewer) access, and lands you directly on the "Hansestack Leak-Check
      Demo" dashboard — the only dashboard provisioned in this stack —
@@ -209,6 +256,23 @@ breaker tuning, and `HANSESTACK_MAX_IDLE_CONNS`). None of these are
 required beyond `HANSESTACK_API_KEY` — the rest have sane defaults baked
 into the Caddyfile itself.
 
+See [`EdgeCaddyfile`](./EdgeCaddyfile) for the edge-proxy's own three
+environment variables, also defined in `.env.skel`:
+
+- `SITE_ADDRESS` (default `http://localhost`) — the edge-proxy's site
+  address. Locally this stays as plain `http://localhost` (no TLS
+  attempted). Set it to a bare domain (e.g. `demo.hansestack.de`, no
+  scheme) to deploy publicly — Caddy then automatically obtains and
+  renews a Let's Encrypt certificate and serves HTTPS, with no other
+  config change required.
+- `RATE_LIMIT_EVENTS` (default `10`) and `RATE_LIMIT_WINDOW` (default
+  `1m`) — together define the `/login` rate limit: at most
+  `RATE_LIMIT_EVENTS` requests per `RATE_LIMIT_WINDOW`, keyed per client
+  (`{remote_host}`). Requests over the limit get a `429 Too Many
+  Requests` straight from the edge-proxy — Caddy's hansestack middleware
+  and the backend never see them, and (more importantly for this demo)
+  neither does the shared, sponsored Hansestack SaaS API key.
+
 The Caddyfile has no `endpoint` directive set, so the `hansestack
 leakcheck` handler defaults to the public Hansestack SaaS API — there is no
 local leak-check server to run or configure. `max_idle_conns` (default
@@ -228,6 +292,7 @@ change to safely enable leak-checking against your real login flow.
 
 ```
 .
+├── EdgeCaddyfile                      # edge-proxy config (API Gateway/LB stand-in)
 ├── Caddyfile                          # the security layer's entire config
 ├── docker-compose.yml
 ├── .env.skel
