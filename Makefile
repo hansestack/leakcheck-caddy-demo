@@ -7,7 +7,7 @@ ifneq (,$(wildcard ./.env))
 endif
 
 APP_URL     := http://localhost
-GRAFANA_URL := http://localhost:3000
+GRAFANA_URL := http://localhost/grafana/
 
 # ==============================================================================
 # Phony declarations

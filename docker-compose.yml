@@ -1,9 +1,41 @@
 services:
-  caddy:
-    image: ghcr.io/hansestack/caddy-hansestack:latest
+  edge-proxy:
+    # Custom-built (not stock caddy:alpine) so it includes the
+    # mholt/caddy-ratelimit module, which protects our sponsored/shared
+    # Hansestack SaaS API key from being exhausted by any single client
+    # hammering /login.
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM caddy:builder-alpine AS builder
+        RUN xcaddy build --with github.com/mholt/caddy-ratelimit
+
+        FROM caddy:alpine
+        COPY --from=builder /usr/bin/caddy /usr/bin/caddy
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-http://localhost}
+      RATE_LIMIT_EVENTS: ${RATE_LIMIT_EVENTS:-10}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-1m}
+    volumes:
+      - ./EdgeCaddyfile:/etc/caddy/Caddyfile:ro
+      - edge_caddy_data:/data
+      - edge_caddy_config:/config
+    depends_on:
+      - caddy
+      - grafana
+
+  caddy:
+    image: ghcr.io/hansestack/caddy-hansestack:latest
+    restart: unless-stopped
+    # No "80:80" published here anymore: the hansestack middleware is only
+    # reachable internally, via edge-proxy at caddy:80 -- demonstrating that
+    # it slots into an existing network chain without needing its own
+    # public-facing port.
+    ports:
       # Admin API / metrics endpoint: only bound to localhost on the HOST,
       # even though Caddy itself listens on 0.0.0.0:2019 inside the
       # container (see the Caddyfile comment for why).
@@ -43,8 +75,8 @@ services:
   grafana:
     image: grafana/grafana:latest
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    # No "3000:3000" published here anymore: Grafana is only reachable
+    # through edge-proxy, under the /grafana/ subpath on port 80.
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -57,6 +89,17 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/hansestack.json
+      # Served under a subpath (via edge-proxy) rather than at the domain
+      # root, and embedded in an iframe/kiosk link from backend/index.html.
+      # %(protocol)s/%(domain)s are Grafana's own config placeholders, so
+      # this resolves correctly whether the edge-proxy is serving plain
+      # http://localhost (local dev) or https://demo.hansestack.de
+      # (production, once SITE_ADDRESS is set to a real domain) without
+      # editing this value.
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_HIDE_VERSION: "true"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -65,6 +108,8 @@ services:
       - victoriametrics
 
 volumes:
+  edge_caddy_data:
+  edge_caddy_config:
   caddy_data:
   caddy_config:
   vm_data:
