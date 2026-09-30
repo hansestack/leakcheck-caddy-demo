@@ -226,8 +226,9 @@ Grafana's anonymous access is scoped to the `Viewer` role, so it can view
 the provisioned dashboard but cannot edit it, create new ones, or reach
 admin/server settings. This is a convenience for a local demo only — do
 not expose this Grafana instance to the internet as configured. The
-`admin` / `admin` credentials still work at Grafana's `/login` page if you
-need to make changes.
+`GF_SECURITY_ADMIN_USER` / `GF_SECURITY_ADMIN_PASSWORD` credentials from
+your `.env` still work at Grafana's `/login` page if you need to make
+changes — see [Configuration reference](#configuration-reference) below.
 
 ## Makefile targets
 
@@ -272,6 +273,18 @@ environment variables, also defined in `.env.skel`:
   Requests` straight from the edge-proxy — Caddy's hansestack middleware
   and the backend never see them, and (more importantly for this demo)
   neither does the shared, sponsored Hansestack SaaS API key.
+
+Grafana's admin credentials also come from `.env`, never from
+`docker-compose.yml` (which is version-controlled and must never contain
+real secrets):
+
+- `GF_SECURITY_ADMIN_USER` (default `admin`) — the Grafana admin username.
+- `GF_SECURITY_ADMIN_PASSWORD` — **required, no default.** `docker compose
+  up` fails fast with a clear error if this isn't set. Copy
+  [`.env.skel`](./.env.skel) to `.env` and pick your own value before
+  running this stack anywhere beyond localhost. This only gates the
+  `/login` (admin) path into Grafana — the anonymous, read-only dashboard
+  access configured via `GF_AUTH_ANONYMOUS_*` is separate and unaffected.
 
 The Caddyfile has no `endpoint` directive set, so the `hansestack
 leakcheck` handler defaults to the public Hansestack SaaS API — there is no
