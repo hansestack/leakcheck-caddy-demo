@@ -110,9 +110,9 @@ backend and your client see byte-for-byte the same traffic as if the
 plugin weren't installed at all; only Caddy's own `/metrics` endpoint
 knows the check ran. Because this counter fires in every mode, not just
 `block` — `observe`/`enrich_request`/`enrich_response` all forward the
-request regardless of the check result — the "Confirmed ATOs" tile in
-Grafana lights up identically whether you're running `observe`,
-`enrich_response`, or `block`. It's a one-line Caddyfile edit
+request regardless of the check result — the "Successful Login with
+Leaked Creds" tile in Grafana lights up identically whether you're
+running `observe`, `enrich_response`, or `block`. It's a one-line Caddyfile edit
 (`mode observe`) if you want to try it; this repo's default stays
 `enrich_response` since the demo frontend uses the response header to show
 a UI banner.
@@ -164,16 +164,16 @@ directly to the public Hansestack SaaS API over the internet, using only
 
    - **App**: [http://localhost](http://localhost) — log in with a
      known-leaked password, **`password123`**, then immediately flip to
-     Grafana: the new **"🚨 Confirmed ATOs (Leaked + 2xx)"** tile turns
-     bright red. This isn't a simulated demo value — it's real: the leak
-     check genuinely confirms `password123` is breached, and
+     Grafana: the new **"Successful Login with Leaked Creds (2xx)"** tile
+     turns bright red. This isn't a simulated demo value — it's real: the
+     leak check genuinely confirms `password123` is breached, and
      `dummy-backend`'s `POST /login` **always** returns `201 Created`
      unconditionally (no database, no password hashing, no auth logic at
      all), so every leaked-password login in this demo is, by
-     construction, a live "Confirmed ATO" — a leaked credential that was
+     construction, a live successful login with a known-leaked credential
      accepted by the backend. If you instead switch the Caddyfile's `mode`
      to `block`, the same `password123` login now gets a `401` instead,
-     and the **"🛡️ Defeated ATOs (Leaked + 4xx)"** tile increments in
+     and the **"Defeated ATOs (Leaked + 4xx)"** tile increments in
      place of the red one — a quick before/after of enabling blocking.
      The app page itself also has a **"📊 Open Live Grafana Dashboard
      (Kiosk Mode)"** link right below the login form — click it for a
@@ -195,14 +195,14 @@ directly to the public Hansestack SaaS API over the internet, using only
      organized into five rows:
      - **Traffic Overview** — Caddy's request rate/latency and the leak
        check's verdict/outcome trends over time.
-     - **🚨 Indicator of Compromise (IoC)** — the headline row: "Confirmed
-       ATOs" (leaked password + 2xx, bright red if >0) and "Defeated ATOs"
-       (leaked password + 4xx, amber if >0) stat tiles, a third tile for
-       leaked-but-fail-open-skipped responses, and a "Response Correlation"
-       timeseries breaking every backend response down by leak-check
-       result (`leaked`/`not_leaked`/`skipped`) and status class
-       (`2xx`/`3xx`/`4xx`/`5xx`/`unknown`) — the single most actionable
-       pairing this plugin exposes.
+     - **Indicator of Compromise (IoC)** — the headline row: "Successful
+       Login with Leaked Creds (2xx)" (bright red if >0) and "Defeated
+       ATOs" (leaked password + 4xx, amber if >0) stat tiles, a "Skipped
+       due to Fail-Open" tile for leaked-but-fail-open-skipped responses,
+       and a "Response Correlation" timeseries breaking every backend
+       response down by leak-check result (`leaked`/`not_leaked`/`skipped`)
+       and status class (`2xx`/`3xx`/`4xx`/`5xx`/`unknown`) — the single
+       most actionable pairing this plugin exposes.
      - **Verdicts** — color-coded stat tiles for Total Checks, Leaked
        (green unless >0, then red), and Not Leaked, totaled over whatever
        time range is currently selected in the dashboard's time picker
@@ -226,8 +226,9 @@ Grafana's anonymous access is scoped to the `Viewer` role, so it can view
 the provisioned dashboard but cannot edit it, create new ones, or reach
 admin/server settings. This is a convenience for a local demo only — do
 not expose this Grafana instance to the internet as configured. The
-`admin` / `admin` credentials still work at Grafana's `/login` page if you
-need to make changes.
+`GF_SECURITY_ADMIN_USER` / `GF_SECURITY_ADMIN_PASSWORD` credentials from
+your `.env` still work at Grafana's `/login` page if you need to make
+changes — see [Configuration reference](#configuration-reference) below.
 
 ## Makefile targets
 
@@ -272,6 +273,18 @@ environment variables, also defined in `.env.skel`:
   Requests` straight from the edge-proxy — Caddy's hansestack middleware
   and the backend never see them, and (more importantly for this demo)
   neither does the shared, sponsored Hansestack SaaS API key.
+
+Grafana's admin credentials also come from `.env`, never from
+`docker-compose.yml` (which is version-controlled and must never contain
+real secrets):
+
+- `GF_SECURITY_ADMIN_USER` (default `admin`) — the Grafana admin username.
+- `GF_SECURITY_ADMIN_PASSWORD` — **required, no default.** `docker compose
+  up` fails fast with a clear error if this isn't set. Copy
+  [`.env.skel`](./.env.skel) to `.env` and pick your own value before
+  running this stack anywhere beyond localhost. This only gates the
+  `/login` (admin) path into Grafana — the anonymous, read-only dashboard
+  access configured via `GF_AUTH_ANONYMOUS_*` is separate and unaffected.
 
 The Caddyfile has no `endpoint` directive set, so the `hansestack
 leakcheck` handler defaults to the public Hansestack SaaS API — there is no

@@ -2,11 +2,11 @@
   "id": null,
   "uid": "hansestack-demo",
   "title": "Hansestack Leak-Check Demo",
-  "description": "All single-number stat tiles below are totals over the currently selected time range (see the time picker, top right). Widen or narrow it to see more or less history. The Indicator of Compromise (IoC) row correlates leak-check verdicts with the backend's own HTTP response, surfacing Confirmed/Defeated ATOs.",
+  "description": "All single-number stat tiles below are totals over the currently selected time range (see the time picker, top right). Widen or narrow it to see more or less history. The Indicator of Compromise (IoC) row correlates leak-check verdicts with the backend's own HTTP response, surfacing successful logins with leaked credentials and Defeated ATOs.",
   "tags": ["caddy", "hansestack", "leakcheck", "ioc", "ato"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 4,
+  "version": 5,
   "refresh": "10s",
   "time": { "from": "now-15m", "to": "now" },
   "panels": [
@@ -86,7 +86,7 @@
     },
     {
       "id": 104,
-      "title": "🚨 Indicator of Compromise (IoC)",
+      "title": "Indicator of Compromise (IoC)",
       "type": "row",
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
@@ -94,7 +94,7 @@
     },
     {
       "id": 105,
-      "title": "🚨 Confirmed ATOs (Leaked + 2xx)",
+      "title": "Successful Login with Leaked Creds (2xx)",
       "description": "hansestack_leakcheck_responses_total{result=\"leaked\", status_class=\"2xx\"} — the single most actionable series this plugin exposes: a password confirmed to be in a known breach nonetheless reached the backend and got a successful response, i.e. someone logged in with a known-leaked credential. Recorded in every mode (including observe), not just block.",
       "type": "stat",
       "gridPos": { "h": 6, "w": 8, "x": 0, "y": 18 },
@@ -128,7 +128,7 @@
     },
     {
       "id": 106,
-      "title": "🛡️ Defeated ATOs (Leaked + 4xx)",
+      "title": "Defeated ATOs (Leaked + 4xx)",
       "description": "hansestack_leakcheck_responses_total{result=\"leaked\", status_class=\"4xx\"} — a leaked-password login attempt that the backend (or Caddy in mode=block) rejected with a 4xx. Only ever nonzero when something in the chain actually stops a confirmed-leaked credential from succeeding — enrich_response/enrich_request/observe never block on their own, so this is mode-dependent.",
       "type": "stat",
       "gridPos": { "h": 6, "w": 8, "x": 8, "y": 18 },
@@ -162,7 +162,7 @@
     },
     {
       "id": 107,
-      "title": "Leaked, Fail-Open Skipped",
+      "title": "Skipped due to Fail-Open",
       "description": "hansestack_leakcheck_responses_total{result=\"skipped\"} — the leak check itself was skipped (fail-open: timeout, rate limit, circuit open, client error, or canceled — see the Fail-Open Outcomes row below for the detailed reason) but the backend response was still recorded here for IoC correlation, bucketed by status_class.",
       "type": "stat",
       "gridPos": { "h": 6, "w": 8, "x": 16, "y": 18 },
@@ -197,7 +197,7 @@
     {
       "id": 108,
       "title": "Response Correlation (IoC Breakdown)",
-      "description": "hansestack_leakcheck_responses_total grouped by result and status_class — correlates every leak-check verdict (leaked/not_leaked/skipped) with the backend's actual HTTP response class (2xx/3xx/4xx/5xx/unknown). A rising leaked/2xx series here is the same signal as the red 'Confirmed ATOs' tile above, over time.",
+      "description": "hansestack_leakcheck_responses_total grouped by result and status_class — correlates every leak-check verdict (leaked/not_leaked/skipped) with the backend's actual HTTP response class (2xx/3xx/4xx/5xx/unknown). A rising leaked/2xx series here is the same signal as the red 'Successful Login with Leaked Creds' tile above, over time.",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "VictoriaMetrics" },
