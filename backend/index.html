@@ -144,44 +144,41 @@
       font-size: 0.9rem;
       line-height: 1.4;
     }
-    .grafana-link {
-      display: block;
+    .page-links {
       width: 360px;
       max-width: 90vw;
       box-sizing: border-box;
-      text-align: center;
-      margin-top: 16px;
-      padding: 10px 16px;
-      border-radius: 8px;
-      background: #f4711f;
-      color: #ffffff;
-      font-weight: 700;
-      font-size: 0.9rem;
-      text-decoration: none;
-      transition: background-color 0.15s ease;
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    .grafana-link:hover {
-      background: #d9600f;
-    }
-    .repo-link {
-      display: block;
-      width: 360px;
-      max-width: 90vw;
-      box-sizing: border-box;
+    .page-links-label {
+      margin: 0 0 4px;
       text-align: center;
-      margin-top: 10px;
-      padding: 10px 16px;
-      border-radius: 8px;
-      background: transparent;
-      color: #0f172a;
-      font-weight: 600;
       font-size: 0.85rem;
+      font-weight: 600;
+      color: #4b5563;
+    }
+    .page-link {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      text-align: center;
+      padding: 9px 16px;
+      border-radius: 6px;
+      background-color: transparent;
+      color: #4b5563;
+      font-weight: 500;
+      font-size: 13px;
+      line-height: 20px;
       text-decoration: none;
       border: 1px solid rgb(209, 213, 219);
-      transition: background-color 0.15s ease;
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
-    .repo-link:hover {
-      background: #f4f5f7;
+    .page-link:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+      color: #111827;
     }
   </style>
 </head>
@@ -211,20 +208,23 @@
     </form>
 
     <div id="message" class="message"></div>
+  </div>
 
+  <div class="page-links">
+    <p class="page-links-label">More about this demo</p>
     <a
-      class="grafana-link"
+      class="page-link"
       href="/grafana/d/hansestack-demo/hansestack-leak-check-demo?orgId=1&kiosk=tv&refresh=5s"
       target="_blank"
       rel="noopener noreferrer"
     >📊 Open Live Grafana Dashboard (Kiosk Mode)</a>
 
     <a
-      class="repo-link"
+      class="page-link"
       href="https://github.com/hansestack/leakcheck-caddy-demo"
       target="_blank"
       rel="noopener noreferrer"
-    >💻 Want to try this in your own infrastructure? Check out your own test env: github.com/hansestack/leakcheck-caddy-demo</a>
+    >💻 Want to try this in your own infrastructure?<br />Check out your own test env:<br />github.com/hansestack/leakcheck-caddy-demo</a>
   </div>
 
   <script>
