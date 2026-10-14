@@ -37,11 +37,13 @@ sequenceDiagram
     Edge-->>Client: 201 Created<br/>+ X-Hansestack-Leaked<br/>+ X-Hansestack-Leak-Count
 ```
 
-By default (no `endpoint` set in the Caddyfile), Caddy calls the public
+By default (`HANSESTACK_ENDPOINT` unset in `.env`), Caddy calls the public
 **Hansestack SaaS API** over the internet for every check — there is no
-local leak-check server or sidecar in this demo. Swapping to a self-hosted
-/ on-premise `endpoint` is possible but out of scope for this demo's
-default configuration.
+local leak-check server or sidecar in this demo. Set `HANSESTACK_ENDPOINT`
+in `.env` to point the `endpoint` directive at a self-hosted / on-premise
+deployment instead (e.g. a sidecar container running alongside your app) —
+`HANSESTACK_API_KEY` can then be left unset if that deployment runs with
+authentication disabled.
 
 The backend is only ever called through Caddy — it never sees the leak
 check happen, and (in `enrich_response` mode) it is never blocked by it
@@ -252,10 +254,11 @@ Run `make help` at any time to see this list with descriptions.
 
 See [`Caddyfile`](./Caddyfile) for the full directive and
 [`.env.skel`](./.env.skel) for the environment variables it reads
-(`HANSESTACK_API_KEY`, plus optional `HANSESTACK_TIMEOUT`, circuit
-breaker tuning, and `HANSESTACK_MAX_IDLE_CONNS`). None of these are
-required beyond `HANSESTACK_API_KEY` — the rest have sane defaults baked
-into the Caddyfile itself.
+(`HANSESTACK_API_KEY`, plus optional `HANSESTACK_ENDPOINT`,
+`HANSESTACK_TIMEOUT`, circuit breaker tuning, and
+`HANSESTACK_MAX_IDLE_CONNS`). None of these are required beyond
+`HANSESTACK_API_KEY` — the rest have sane defaults baked into the
+Caddyfile itself.
 
 See [`EdgeCaddyfile`](./EdgeCaddyfile) for the edge-proxy's own three
 environment variables, also defined in `.env.skel`:
@@ -286,9 +289,11 @@ real secrets):
   `/login` (admin) path into Grafana — the anonymous, read-only dashboard
   access configured via `GF_AUTH_ANONYMOUS_*` is separate and unaffected.
 
-The Caddyfile has no `endpoint` directive set, so the `hansestack
-leakcheck` handler defaults to the public Hansestack SaaS API — there is no
-local leak-check server to run or configure. `max_idle_conns` (default
+The Caddyfile's `endpoint` directive defaults to the public Hansestack
+SaaS API (`{$HANSESTACK_ENDPOINT:https://api.hansestack.de/leakcheck}`) —
+there is no local leak-check server to run or configure unless you set
+`HANSESTACK_ENDPOINT` in `.env` to point at a self-hosted / on-premise
+deployment. `max_idle_conns` (default
 `200`, overridable via `HANSESTACK_MAX_IDLE_CONNS`) caps how many idle
 keep-alive connections the underlying HTTP client pools to that SaaS API,
 which bounds TCP socket growth under a login traffic spike instead of
