@@ -24,6 +24,24 @@
 #     and serves HTTPS, redirecting HTTP to HTTPS -- with no other change to
 #     this file.
 {$SITE_ADDRESS:http://localhost} {
+	# Distinguishes this hop's hard-coded "Via: 1.1 Caddy" response header
+	# (added internally by reverse_proxy itself, not a configurable plugin
+	# option -- see github.com/caddyserver/caddy issue #6275) from the
+	# hansestack Caddy instance's own identical header behind it, so both
+	# hops are identifiable in the chain the client actually sees: "Via:
+	# 1.1 HansestackCaddy, 1.1 EdgeCaddy". Applies to every route in this
+	# file (Grafana included), since edge-proxy is the one hop common to
+	# all of them. Must be the top-level `header` directive with the `>`
+	# (deferred) prefix, not reverse_proxy's own `header_down` subdirective
+	# -- reverse_proxy applies header_down to the upstream response before
+	# it adds its own Via header, so a header_down replacement there would
+	# run too early to see it. The regex is anchored to match only the
+	# exact, unmodified "<proto> Caddy" value Caddy itself adds -- an
+	# unanchored substring search would also match (and corrupt) the
+	# hansestack Caddy instance's own "HansestackCaddy" value once both
+	# hops are chained, since it too contains the substring "Caddy".
+	header >Via "^([0-9.]+) Caddy$" "${1} EdgeCaddy"
+
 	# Serves Grafana under a subpath so the whole demo -- app + dashboards --
 	# is reachable through this single edge proxy. Grafana itself is
 	# configured (see docker-compose.yml) with GF_SERVER_SERVE_FROM_SUB_PATH

@@ -13,6 +13,8 @@
 	# Scoped to /login* so that every other route reaches reverse_proxy directly.
 	hansestack /login* leakcheck {
 		api_key {$HANSESTACK_API_KEY}
+		endpoint {$HANSESTACK_ENDPOINT:https://api.hansestack.de/leakcheck}
+
 		mode enrich_response
 		password_field "password"
 		header_leaked "X-Hansestack-Leaked"
@@ -24,6 +26,22 @@
 		circuit_breaker_cooldown {$HANSESTACK_CIRCUIT_BREAKER_COOLDOWN:30s}
 		max_idle_conns {$HANSESTACK_MAX_IDLE_CONNS:200}
 	}
+
+	# Distinguishes this hop's hard-coded "Via: 1.1 Caddy" response header
+	# (added internally by reverse_proxy itself, not a configurable plugin
+	# option -- see github.com/caddyserver/caddy issue #6275) from the
+	# edge-proxy's own identical header, so both hops are identifiable in
+	# the chain the client actually sees: "Via: 1.1 HansestackCaddy, 1.1
+	# EdgeCaddy". Must be the top-level `header` directive with the `>`
+	# (deferred) prefix, not reverse_proxy's own `header_down` subdirective
+	# -- reverse_proxy applies header_down to the upstream response before
+	# it adds its own Via header, so a header_down replacement here would
+	# run too early to see it. The regex is anchored to match only the
+	# exact, unmodified "<proto> Caddy" value Caddy itself adds -- an
+	# unanchored substring search would also match (and corrupt) the
+	# edge-proxy's own "EdgeCaddy" value once both hops are chained,
+	# since it too contains the substring "Caddy".
+	header >Via "^([0-9.]+) Caddy$" "${1} HansestackCaddy"
 
 	reverse_proxy dummy-backend:80
 }
